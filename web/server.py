@@ -354,4 +354,4 @@ def delete_message(id):
 
 if __name__ == '__main__':
     app.secret_key = ".."
-    app.run(port=8080, threaded=True, debug=True, host=('localhost'))
+    app.run(port=8080, threaded=True, debug=True, host=('ec2-18-223-162-244.us-east-2.compute.amazonaws.com'))
