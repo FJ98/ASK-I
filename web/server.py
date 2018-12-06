@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, session, Response
 from database import connector
 from model import entities
+from sqlalchemy import and_
 import json
 db = connector.Manager()
 engine = db.createEngine()
@@ -121,6 +122,25 @@ def do_pin():
     return render_template('fail.html')
 
 # FIN
+@app.route('/mobile_do_pin', methods=['POST'])
+def mobile_do_pin():
+    body = request.get_json(silent=True)
+    print(body)
+    pin = body['pin']
+    sessiondb = db.getSession(engine)
+    sala = sessiondb.query(entities.Sala).filter(entities.Sala.pin == pin).first()
+    if sala != None:
+        session['pin'] = sala.pin
+        return Response(json.dumps(
+            {'response': True, 'pin': sala.pin,"name":sala.name},
+            cls=connector.AlchemyEncoder
+        ), mimetype='application/json')
+    else:
+        return Response(json.dumps(
+            {'response': False},
+            cls=connector.AlchemyEncoder
+        ), mimetype='application/json')
+
 
 
 # CRUD PARA CADA CLASE DE ENTITIES.PY
@@ -155,6 +175,29 @@ def create_sala():
         db_session.commit()
     return render_template('sala.html')
 # FIN
+
+
+@app.route('/sala_mobile', methods=['POST'])
+def create_sala_mobile():
+    body = request.get_json(silent=True)
+    print(body)
+    name = body['name']
+    db_session = db.getSession(engine)
+    numero = db_session.query(entities.Contador).first()
+    pin = ((numero.number) * primo) % 90000000 + 10000000
+    sala = entities.Sala(name=name, pin=pin)
+    db_session.add(sala)
+    numeros = db_session.query(entities.Contador).filter(entities.Contador.id == 1)
+    for numero_ in numeros:
+        numero_.number = numero.number + 1
+        db_session.add(numero_)
+        db_session.commit()
+    return Response(json.dumps(
+            {'response':True, 'pin':pin,'name':name},
+            cls=connector.AlchemyEncoder
+        ),mimetype='application/json')
+
+
 
 
 
@@ -200,6 +243,8 @@ def current_user():
 
 
 # CREATE USER METHOD
+
+
 @app.route('/users', methods=['GET'])
 def create_user():
     db_session = db.getSession(engine)
@@ -208,7 +253,7 @@ def create_user():
     for user in users:
         data.append(user)
 
-    return Response(json.dumps(data,
+    return Response(json.dumps({'data':data},
                                cls=connector.AlchemyEncoder),
                     mimetype='application/json')
 # FIN
@@ -311,12 +356,46 @@ def get_message_by_pin(sala_pin):
                                cls=connector.AlchemyEncoder),
                     mimetype='application/json')
 # FIN
+@app.route('/messages_mobile/<sala_pin>', methods = ['GET'])
+def get_message_m_by_pin(sala_pin):
+    db_session = db.getSession(engine)
+    messages = db_session.query(entities.Message).filter(entities.Message.pin == sala_pin)
+    data = []
+    for message in messages:
+        data.append(message)
+    return Response(json.dumps({"data":data},
+                               cls=connector.AlchemyEncoder),
+                    mimetype='application/json')
+
+@app.route('/mobile_login', methods=['POST'])
+def mobile_login():
+    body = request.get_json(silent=True)
+    print(body)
+    username = body['username']
+    password = body['password']
+    sessiondb = db.getSession(engine)
+    user = sessiondb.query(entities.User).filter(and_(entities.User.username ==username , entities.User.password == password)).first()
+    if user != None :
+        session['logged'] = user.id
+        return Response(json.dumps(
+            {'response':True, 'id':user.id},
+            cls=connector.AlchemyEncoder
+        ),mimetype='application/json')
+    else:
+        return Response(json.dumps(
+            {'response':False},
+            cls=connector.AlchemyEncoder
+        ),mimetype='application/json')
+
+
+
 
 
 # UPDATE MESSAGE METHOD
 @app.route('/messages', methods = ['POST'])
 def create_message():
     c = request.get_json(silent=True)
+    print(c)
     db_session = db.getSession(engine)
 
     message = entities.Message(content= c['content'],
@@ -354,4 +433,4 @@ def delete_message(id):
 
 if __name__ == '__main__':
     app.secret_key = ".."
-    app.run(port=8080, threaded=True, debug=True, host=('ec2-18-223-162-244.us-east-2.compute.amazonaws.com'))
+    app.run(port=8080, threaded=True, debug=True, host=('localhost'))
